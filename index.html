@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>废弃医院档案室 - 密室逃脱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        // 配置Tailwind自定义颜色
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            light: '#f5d384',
+                            DEFAULT: '#d4af37',
+                            dark: '#b8860b'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['SimHei', 'Microsoft YaHei', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 0 10px rgba(212, 175, 55, 0.7);
+            }
+            .text-shadow-lg {
+                text-shadow: 0 0 15px rgba(212, 175, 55, 0.9);
+            }
+            .bg-noise {
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E");
+            }
+            .animate-flicker {
+                animation: flicker 3s linear infinite;
+            }
+            @keyframes flicker {
+                0%, 19.999%, 22%, 62.999%, 64%, 64.999%, 70%, 100% {
+                    opacity: 1;
+                }
+                20%, 21.999%, 63%, 63.999%, 65%, 69.999% {
+                    opacity: 0.4;
+                }
+            }
+            .animate-pulse-slow {
+                animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            .option-hover {
+                transition: all 0.3s ease;
+            }
+            .option-hover:hover {
+                transform: translateX(8px);
+                filter: brightness(1.2);
+            }
+            .typing-cursor {
+                display: inline-block;
+                width: 0.5em;
+                height: 1em;
+                background-color: currentColor;
+                animation: blink 1s step-end infinite;
+            }
+            @keyframes blink {
+                from, to { opacity: 1; }
+                50% { opacity: 0; }
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen transition-colors duration-500 bg-black text-white bg-noise">
+    <!-- 顶部导航栏 -->
+    <header class="sticky top-0 z-50 backdrop-blur-md bg-black/70 border-b border-gold/30 transition-all duration-500">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-gold text-shadow-lg animate-pulse-slow">废弃医院档案室</h1>
+            <div class="flex gap-4">
+                <button id="restart-btn" class="hover:text-gold transition-colors duration-300 flex items-center gap-1">
+                    <i class="fa fa-refresh"></i> 重开
+                </button>
+                <button id="save-btn" class="hover:text-gold transition-colors duration-300 flex items-center gap-1">
+                    <i class="fa fa-save"></i> 暂存
+                </button>
+                <button id="load-btn" class="hover:text-gold transition-colors duration-300 flex items-center gap-1">
+                    <i class="fa fa-load"></i> 读取
+                </button>
+                <button id="theme-btn" class="hover:text-gold transition-colors duration-300 flex items-center gap-1">
+                    <i class="fa fa-paint-brush"></i> 主题
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主游戏区域 -->
+    <main class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 玩家代号输入 -->
+        <div id="code-input" class="mb-8 text-center">
+            <p class="text-lg mb-4">为了方便称呼，请给自己取个代号吧：</p>
+            <div class="flex justify-center items-center gap-2">
+                <span>【</span>
+                <input type="text" id="player-code" class="bg-transparent border-b border-gold text-center py-1 w-32 focus:outline-none focus:border-gold-light" maxlength="5">
+                <span>】</span>
+                <button id="confirm-code" class="ml-2 px-4 py-1 border border-gold text-gold hover:bg-gold/10 rounded transition-colors duration-300">确认</button>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div id="status-bar" class="hidden mb-8 p-4 border border-gold/50 rounded-lg relative overflow-hidden">
+            <div class="absolute inset-0 bg-gold/5"></div>
+            <div class="relative z-10">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-gold"><i class="fa fa-heartbeat"></i> 敌人距离：<span id="enemy-distance">7</span></span>
+                    <span class="text-gold"><i class="fa fa-briefcase"></i> 关键道具：<span id="key-item">无</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 注意事项 -->
+        <div id="notes" class="hidden mb-8 p-4 border border-gold/30 rounded-lg bg-black/50">
+            <h2 class="text-xl font-bold text-gold mb-2">【注意事项】</h2>
+            <ul class="list-disc list-inside space-y-1">
+                <li>缝合怪对纸张翻动声敏感，翻阅病历需轻缓</li>
+                <li>档案室的铁皮柜部分柜门松动，强行拉开可能触发坍塌</li>
+                <li>最终出口钥匙藏在编号073的病历中，需先找到病历柜索引</li>
+                <li>若听到针线拉扯声，需在8秒内找到密闭空间躲避</li>
+            </ul>
+        </div>
+
+        <!-- 游戏内容区域 -->
+        <div id="game-content" class="mb-12 leading-relaxed text-lg">
+            <!-- 游戏内容将通过JS动态插入 -->
+        </div>
+
+        <!-- 选项区域 -->
+        <div id="options" class="space-y-3 mb-8 hidden">
+            <!-- 选项将通过JS动态插入 -->
+        </div>
+
+        <!-- 死亡结局 -->
+        <div id="death结局" class="hidden mb-8 p-6 text-center">
+            <h2 id="death-title" class="text-2xl font-bold text-red-500 mb-4"></h2>
+            <button id="restart-after-death" class="px-6 py-2 bg-gold text-black font-bold rounded hover:bg-gold-light transition-colors duration-300">
+                重新开始
+            </button>
+        </div>
+
+        <!-- 成功结局 -->
+        <div id="success结局" class="hidden mb-8 p-6 text-center">
+            <h2 class="text-2xl font-bold text-green-500 mb-4">恭喜逃脱成功！</h2>
+            <p id="success-text" class="mb-6"></p>
+            <button id="restart-after-success" class="px-6 py-2 bg-gold text-black font-bold rounded hover:bg-gold-light transition-colors duration-300">
+                再玩一次
+            </button>
+        </div>
+
+        <!-- 存档提示 -->
+        <div id="save-notification" class="fixed bottom-4 right-4 bg-gold text-black px-4 py-2 rounded shadow-lg transform translate-y-20 opacity-0 transition-all duration-500 flex items-center gap-2">
+            <i class="fa fa-check-circle"></i>
+            <span>游戏已暂存</span>
+        </div>
+
+        <!-- 读取提示 -->
+        <div id="load-notification" class="fixed bottom-4 right-4 bg-gold text-black px-4 py-2 rounded shadow-lg transform translate-y-20 opacity-0 transition-all duration-500 flex items-center gap-2">
+            <i class="fa fa-check-circle"></i>
+            <span>已读取存档</span>
+        </div>
+    </main>
+
+    <footer class="mt-auto py-4 border-t border-gold/30 text-center text-sm text-gray-400">
+        <p>密室逃脱 - 废弃医院档案室 &copy; 2023</p>
+    </footer>
+
+    <script>
+        // 游戏状态数据
+        const gameState = {
+            currentScene: 'start',
+            playerCode: '',
+            enemyDistance: 7,
+            keyItem: '无',
+            darkTheme: true,
+            isTyping: false
+        };
+
+        // 存档数据
+        let savedState = null;
+
+        // 游戏场景定义 - 文本按句子拆分
+        const scenes = {
+            start: {
+                text: [
+                    "你推开医院档案室的木门，消毒水味混合着纸张霉变的味道扑面而来，头顶的白炽灯忽明忽暗，在地面投下晃动的阴影。",
+                    "墙角的旧病历散落一地，封面的字迹早已模糊，只有墙上挂着的 “档案室管理制度” 牌还能看清。",
+                    "而牌面下方，一道新鲜的抓痕正泛着冷光，你知道，藏在暗处的 “缝合怪”，已经感知到了活人的气息。"
+                ],
+                options: [
+                    { text: 'A. 走向左方的铁皮病历柜', nextScene: 'choiceA' },
+                    { text: 'B. 走向右方的值班台', nextScene: 'choiceB' }
+                ]
+            },
+            choiceA: {
+                text: [
+                    "你刚伸手触碰最外侧的铁皮柜，柜门突然 “哐当” 一声脱落，里面堆叠的病历瞬间倾泻而下，将你埋在纸堆中。",
+                    "纸张翻动的声响惊动了远处的缝合怪，“针线拉扯声” 越来越近，你挣扎着想爬出来，却被一张沾着黏液的病历缠住手腕 —— 下一秒，冰冷的缝合针穿透了你的皮肤……"
+                ],
+                结局: 'death',
+                结局Text: '【死亡结局-纸堆囚笼】'
+            },
+            choiceB: {
+                text: [
+                    "你走到值班台前，发现电脑屏幕上显示着 “病历柜索引表”，但需要密码才能查看。",
+                    "你刚想尝试按键，身后突然传来脚步声，你猛地转身，看见两个身影站在门口：",
+                    "右边的男子面容清俊，穿着深色冲锋衣，手里拿着一个手电筒；左边的高大男子穿着黑色风衣，墨镜挂在衣领上，指尖夹着一根铁丝。",
+                    "——是苍一和鹰眼！你回想起上一次在大型团队电影的经历，向他们点了点头。",
+                    "拿手电筒的人——苍一指了指电脑屏幕：“你刚才试过密码吗？”",
+                    "你摇头，苍一立刻蹲下身，盯着键盘上的磨损痕迹：“常用键是1、3、7，可能是医院的建立年份，1973？”",
+                    "鹰眼闻言，伸手按动键盘 “1973”。",
+                    "屏幕瞬间亮起，索引表显示073号病历在3号柜第5层”。",
+                    "苍一收起手电筒，手搭在鹰眼肩上。",
+                    "你跟在后面，看着两人并肩前行的背影，心里突然冒出一个念头：他们好有默契，连对方下一步要做什么都知道？"
+                ],
+                options: [
+                    { text: '继续前进', nextScene: 'afterChoiceB' }
+                ],
+                updateState: () => {
+                    gameState.enemyDistance = 6;
+                    gameState.keyItem = '病历柜索引（电子）';
+                    updateStatusBar();
+                }
+            },
+            afterChoiceB: {
+                text: [
+                    "三人来到3号病历柜前，苍一刚要拉开柜门，耳边突然传来针线拉扯声，尖锐又急促。"
+                ],
+                options: [
+                    { text: 'A. 躲进旁边的值班台下方', nextScene: 'choiceA2' },
+                    { text: 'B. 躲进未上锁的2号病历柜', nextScene: 'choiceB2' },
+                    { text: 'C. 原地贴墙站立', nextScene: 'choiceC2' }
+                ]
+            },
+            choiceA2: {
+                text: [
+                    "你刚钻进值班台，就看见鹰眼将苍一拉到另一侧的柜子后，自己则挡在柜子门前。",
+                    "缝合怪的脚步声在台外徘徊，突然，“哐当” 一声，是鹰眼踢倒了旁边的金属垃圾桶，垃圾桶滚动的声音吸引了缝合怪的注意。",
+                    "脚步声渐渐远去……"
+                ],
+                options: [
+                    { text: '继续前进', nextScene: 'afterHiding' }
+                ]
+            },
+            choiceB2: {
+                text: [
+                    "你拉开2号柜的柜门钻了进去，刚要关上门，就听见苍一低声提醒：“别关严！这柜子柜门锈住了，关死会卡住打不开！”",
+                    "可你已经用力推了柜门，“咔嗒” 一声，柜门果然卡死。",
+                    "下一秒，缝合怪的脚步声停在柜子外，针线从柜门缝隙中钻进来，缠住你的脚踝。",
+                    "你想挣扎，却只能眼睁睁看着自己被拖出柜子……"
+                ],
+                结局: 'death',
+                结局Text: '【死亡结局-铁皮囚牢】'
+            },
+            choiceC2: {
+                text: [
+                    "缝合怪的脚步声越来越近，它的头从柜子缝隙中探出来，空洞的眼睛扫过墙面，瞬间锁定你的位置。",
+                    "你想躲，却被它伸出的针线缠住脚踝，硬生生拖向黑暗中……"
+                ],
+                结局: 'death',
+                结局Text: '【死亡结局-针线缠绕】'
+            },
+            afterHiding: {
+                text: [
+                    "躲过缝合怪后，3号柜的柜门有些卡顿。鹰眼伸手拉开时，柜门突然晃动，上面的铁皮碎片眼看就要砸向苍一。",
+                    "苍一却像早有预料，侧身躲开的同时，伸手扶住柜门。",
+                    "“小心点。” 苍一轻声说，鹰眼顺势将柜门固定好，让苍一安全地取出 073 号病历。",
+                    "病历封面沾着一层薄灰，苍一翻开时，里面掉出一张纸条，上面写着 “出口在药房，需用病历换钥匙”。",
+                    "“药房在档案室隔壁。” 鹰眼收起纸条，看向苍一。",
+                    "你跟在两人身后，观察到二人全程没有交流，却默契得像早就约定好一样。",
+                    "来到药房门口，苍一刚要拿出病历，药房里突然传来“砰”的一声，缝合怪从门后扑了出来，目标直指苍一！"
+                ],
+                options: [
+                    { text: 'A. 用旁边的金属药盘砸向缝合怪', nextScene: 'choiceA3' },
+                    { text: 'B. 大喊提醒苍一', nextScene: 'choiceB3' }
+                ]
+            },
+            choiceA3: {
+                text: [
+                    "你抓起药盘砸向缝合怪，却没注意到药盘边缘挂着的输液管 —— 输液管缠住你的手腕，让你没能砸中要害。",
+                    "缝合怪被激怒，转身扑向你……"
+                ],
+                结局: 'death',
+                结局Text: '【死亡结局-激怒怪物】'
+            },
+            choiceB3: {
+                text: [
+                    "你的喊声刚出口，鹰眼已经侧身挡在苍一面前，手里的铁丝瞬间缠上缝合怪的手臂，用力一拉，将它拽向旁边的药架。",
+                    "药架倒塌，压住了缝合怪的腿，苍一趁机将病历递给药房窗口里的 “守钥人”，换回一把铜制钥匙。",
+                    "",
+                    "拿到钥匙后，三人来到出口处，出口的门锁有些生锈，鹰眼刚要插入钥匙，突然发现锁孔里卡着一根针线。",
+                    "“小心，针线可能连着机关。” 苍一立刻提醒，伸手从口袋里掏出镊子。",
+                    "鹰眼接过镊子，精准地夹出针线，没有触动任何机关。",
+                    "“咔嗒” 一声，门锁打开，外面的阳光透了进来。缝合怪的脚步声还在远处，三人快步走出医院。",
+                    "你跟在两人身后，暗暗想到：他俩不会是一对吧？——当时就怀疑了！"
+                ],
+                结局: 'success',
+                结局Text: `【演员苍一、鹰眼、${gameState.playerCode}，存活！】<br>【成功结局-逃出生天】`
+            }
+        };
+
+        // DOM元素
+        const codeInput = document.getElementById('code-input');
+        const playerCodeInput = document.getElementById('player-code');
+        const confirmCodeBtn = document.getElementById('confirm-code');
+        const gameContent = document.getElementById('game-content');
+        const optionsContainer = document.getElementById('options');
+        const death结局 = document.getElementById('death结局');
+        const deathTitle = document.getElementById('death-title');
+        const success结局 = document.getElementById('success结局');
+        const successText = document.getElementById('success-text');
+        const restartBtn = document.getElementById('restart-btn');
+        const restartAfterDeathBtn = document.getElementById('restart-after-death');
+        const restartAfterSuccessBtn = document.getElementById('restart-after-success');
+        const saveBtn = document.getElementById('save-btn');
+        const loadBtn = document.getElementById('load-btn');
+        const themeBtn = document.getElementById('theme-btn');
+        const statusBar = document.getElementById('status-bar');
+        const enemyDistanceEl = document.getElementById('enemy-distance');
+        const keyItemEl = document.getElementById('key-item');
+        const notes = document.getElementById('notes');
+        const saveNotification = document.getElementById('save-notification');
+        const loadNotification = document.getElementById('load-notification');
+
+        // 初始化游戏
+        function initGame() {
+            // 重置游戏状态
+            gameState.currentScene = 'start';
+            gameState.enemyDistance = 7;
+            gameState.keyItem = '无';
+            gameState.isTyping = false;
+            
+            // 隐藏所有区域，显示代号输入
+            codeInput.classList.remove('hidden');
+            gameContent.classList.add('hidden');
+            optionsContainer.classList.add('hidden');
+            death结局.classList.add('hidden');
+            success结局.classList.add('hidden');
+            statusBar.classList.add('hidden');
+            notes.classList.add('hidden');
+            
+            // 清空输入
+            playerCodeInput.value = '';
+        }
+
+        // 开始游戏（输入代号后）
+        function startGame() {
+            const code = playerCodeInput.value.trim() || '玩家';
+            gameState.playerCode = code;
+            
+            // 更新成功结局中的玩家代号
+            scenes.choiceB3.结局Text = `【演员苍一、鹰眼、${code}，存活！】<br>【成功结局-逃出生天】`;
+            
+            // 隐藏代号输入，显示游戏内容
+            codeInput.classList.add('hidden');
+            gameContent.classList.remove('hidden');
+            statusBar.classList.remove('hidden');
+            notes.classList.remove('hidden');
+            
+            // 显示初始场景
+            showScene('start');
+        }
+
+        // 逐句显示文本
+        function typeSentences(sentences, container, index = 0, speed = 30) {
+            if (index >= sentences.length) {
+                // 所有句子显示完毕，移除光标，显示选项
+                const cursor = container.querySelector('.typing-cursor');
+                if (cursor) cursor.remove();
+                
+                gameState.isTyping = false;
+                
+                // 如果是当前场景，显示选项
+                if (container === gameContent) {
+                    const currentScene = scenes[gameState.currentScene];
+                    if (currentScene.options) {
+                        showOptions(currentScene.options);
+                    } else if (currentScene.结局) {
+                        if (currentScene.结局 === 'death') {
+                            deathTitle.innerHTML = currentScene.结局Text;
+                            death结局.classList.remove('hidden');
+                        } else if (currentScene.结局 === 'success') {
+                            successText.innerHTML = currentScene.结局Text;
+                            success结局.classList.remove('hidden');
+                        }
+                    }
+                }
+                return;
+            }
+            
+            gameState.isTyping = true;
+            const sentence = sentences[index];
+            let charIndex = 0;
+            
+            // 添加当前句子的容器和光标
+            if (charIndex === 0) {
+                const sentenceContainer = document.createElement('p');
+                sentenceContainer.className = 'mb-3';
+                container.appendChild(sentenceContainer);
+                
+                const cursor = document.createElement('span');
+                cursor.className = 'typing-cursor';
+                sentenceContainer.appendChild(cursor);
+            }
+            
+            const sentenceContainer = container.lastChild;
+            const cursor = sentenceContainer.querySelector('.typing-cursor');
+            
+            // 打字动画
+            const typingInterval = setInterval(() => {
+                if (charIndex < sentence.length) {
+                    // 在光标前插入字符
+                    sentenceContainer.insertBefore(
+                        document.createTextNode(sentence[charIndex]),
+                        cursor
+                    );
+                    charIndex++;
+                } else {
+                    // 句子完成，移除光标，准备下一句
+                    clearInterval(typingInterval);
+                    
+                    // 移除光标并添加到下一句
+                    cursor.remove();
+                    
+                    // 短暂停顿后继续下一句
+                    setTimeout(() => {
+                        typeSentences(sentences, container, index + 1, speed);
+                    }, 500); // 句间停顿
+                }
+            }, speed);
+        }
+
+        // 显示指定场景
+        function showScene(sceneId) {
+            const scene = scenes[sceneId];
+            if (!scene) return;
+            
+            // 更新当前场景
+            gameState.currentScene = sceneId;
+            
+            // 清空内容区域，隐藏选项和结局
+            gameContent.innerHTML = '';
+            optionsContainer.innerHTML = '';
+            optionsContainer.classList.add('hidden');
+            death结局.classList.add('hidden');
+            success结局.classList.add('hidden');
+            
+            // 如果有场景更新函数，调用它
+            if (scene.updateState) {
+                scene.updateState();
+            }
+            
+            // 开始逐句显示文本
+            typeSentences(scene.text, gameContent);
+            
+            // 滚动到顶部
+            window.scrollTo(0, 0);
+        }
+
+        // 显示选项
+        function showOptions(options) {
+            optionsContainer.innerHTML = '';
+            optionsContainer.classList.remove('hidden');
+            
+            options.forEach(option => {
+                const optionEl = document.createElement('div');
+                optionEl.className = gameState.darkTheme ? 
+                    'option-hover text-gold font-bold cursor-pointer py-2 border-b border-gold/20' :
+                    'option-hover text-gold-dark font-bold cursor-pointer py-2 border-b border-gold-dark/20';
+                optionEl.innerHTML = option.text;
+                optionEl.addEventListener('click', () => {
+                    // 如果正在打字，不响应点击
+                    if (gameState.isTyping) return;
+                    
+                    optionsContainer.classList.add('hidden');
+                    showScene(option.nextScene);
+                });
+                optionsContainer.appendChild(optionEl);
+            });
+        }
+
+        // 更新状态栏
+        function updateStatusBar() {
+            enemyDistanceEl.textContent = gameState.enemyDistance;
+            keyItemEl.textContent = gameState.keyItem;
+        }
+
+        // 保存游戏
+        function saveGame() {
+            // 如果正在打字，不允许存档
+            if (gameState.isTyping) return;
+            
+            savedState = { ...gameState };
+            showNotification(saveNotification);
+        }
+
+        // 加载游戏
+        function loadGame() {
+            // 如果正在打字，不允许读档
+            if (gameState.isTyping || !savedState) return;
+            
+            // 恢复游戏状态
+            Object.assign(gameState, savedState);
+            
+            // 更新UI
+            updateStatusBar();
+            showScene(gameState.currentScene);
+            showNotification(loadNotification);
+        }
+
+        // 显示通知
+        function showNotification(element) {
+            element.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                element.classList.add('translate-y-20', 'opacity-0');
+            }, 2000);
+        }
+
+        // 切换主题
+        function toggleTheme() {
+            gameState.darkTheme = !gameState.darkTheme;
+            const body = document.body;
+            const header = document.querySelector('header');
+            
+            if (gameState.darkTheme) {
+                // 深色主题
+                body.classList.remove('bg-white', 'text-black');
+                body.classList.add('bg-black', 'text-white');
+                header.classList.remove('bg-white/70', 'border-gray-300');
+                header.classList.add('bg-black/70', 'border-gold/30');
+                
+                // 更新选项颜色
+                document.querySelectorAll('#options > div').forEach(option => {
+                    option.classList.remove('text-gold-dark');
+                    option.classList.add('text-gold');
+                });
+            } else {
+                // 浅色主题
+                body.classList.remove('bg-black', 'text-white');
+                body.classList.add('bg-white', 'text-black');
+                header.classList.remove('bg-black/70', 'border-gold/30');
+                header.classList.add('bg-white/70', 'border-gray-300');
+                
+                // 更新选项颜色
+                document.querySelectorAll('#options > div').forEach(option => {
+                    option.classList.remove('text-gold');
+                    option.classList.add('text-gold-dark');
+                });
+            }
+        }
+
+        // 事件监听
+        confirmCodeBtn.addEventListener('click', startGame);
+        playerCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') startGame();
+        });
+        restartBtn.addEventListener('click', () => {
+            // 如果正在打字，不允许重开
+            if (gameState.isTyping) return;
+            initGame();
+        });
+        restartAfterDeathBtn.addEventListener('click', initGame);
+        restartAfterSuccessBtn.addEventListener('click', initGame);
+        saveBtn.addEventListener('click', saveGame);
+        loadBtn.addEventListener('click', loadGame);
+        themeBtn.addEventListener('click', toggleTheme);
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
+    
